@@ -48,7 +48,6 @@ pub enum TokenType {
     Return,
 
     Newline,
-    Whitespace,
 }
 
 impl fmt::Display for TokenType {
@@ -99,7 +98,6 @@ impl fmt::Display for TokenType {
             Return => write!(f, "'return'"),
 
             Newline => write!(f, "'\\n'"),
-            Whitespace => write!(f, "' '"),
         }
     }
 }

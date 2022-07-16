@@ -55,18 +55,20 @@ impl<'a> Lexer<'a> {
     pub fn lex(&mut self) -> Result<Vec<Token>, LexerError> {
         let mut tokens: Vec<Token> = vec![];
         while let Some(token) = self.next_token()? {
-            tokens.push(token);
+            tokens.push(token.clone());
         }
         Ok(tokens)
     }
 
     fn next_token(&mut self) -> Result<Option<Token>, LexerError> {
         let start = self.position;
+        loop {
+            match self.ch {
+                ' ' | '\t' | '\r' => self.advance(),
+                _ => break,
+            };
+        }
         match self.ch {
-            ' ' | '\t' | '\r' => {
-                self.advance();
-                Ok(Some(Token::new(Whitespace, start, self.position)))
-            }
             '0'..='9' => self.number(),
             '"' => self.string(),
             '\'' => self.char(),
