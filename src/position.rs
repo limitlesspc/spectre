@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Position<'a> {
     source: &'a str,
-    index: usize,
+    pub index: usize,
     line: usize,
     column: usize,
 }

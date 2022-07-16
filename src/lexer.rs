@@ -1,26 +1,25 @@
 use std::fmt;
-use std::str::Chars;
 
 use crate::Position;
 use crate::{Token, TokenType};
 use TokenType::*;
 
 pub struct Lexer<'a> {
-    chars: Chars<'a>,
+    source: &'a str,
     ch: char,
     position: Position<'a>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct LexerError<'a> {
+pub struct LexError<'a> {
     message: String,
     start: Position<'a>,
     end: Position<'a>,
 }
 
-impl<'a> LexerError<'a> {
+impl<'a> LexError<'a> {
     fn new(message: String, start: Position<'a>, end: Position<'a>) -> Self {
-        LexerError {
+        Self {
             message,
             start,
             end,
@@ -28,46 +27,38 @@ impl<'a> LexerError<'a> {
     }
 }
 
-impl<'a> fmt::Display for LexerError<'a> {
+impl<'a> fmt::Display for LexError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}-{} {}", self.start, self.end, self.message)
     }
 }
 
+type LexResult<'a> = Result<Option<Token<'a>>, LexError<'a>>;
+
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
-        let mut chars = source.chars();
         Self {
-            ch: chars.next().unwrap_or('\0'),
-            chars,
+            source,
+            ch: source.chars().nth(0).unwrap_or('\0'),
             position: Position::new(&source),
         }
     }
 
     fn advance(&mut self) {
-        self.ch = match self.chars.next() {
-            Some(ch) => ch,
-            None => '\0',
-        };
         self.position.advance();
+        self.ch = self.source.chars().nth(self.position.index).unwrap_or('\0');
     }
 
-    pub fn lex(&mut self) -> Result<Vec<Token>, LexerError> {
-        let mut tokens: Vec<Token> = vec![];
-        while let Some(token) = self.next_token()? {
-            tokens.push(token.clone());
-        }
-        Ok(tokens)
-    }
-
-    fn next_token(&mut self) -> Result<Option<Token>, LexerError> {
-        let start = self.position;
+    pub fn next_token(&mut self) -> LexResult {
         loop {
             match self.ch {
                 ' ' | '\t' | '\r' => self.advance(),
                 _ => break,
-            };
+            }
         }
+
+        let start = self.position;
+
         match self.ch {
             '0'..='9' => self.number(),
             '"' => self.string(),
@@ -177,12 +168,16 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(Some(Token::new(RBrace, start, self.position)))
             }
+            ':' => {
+                self.advance();
+                Ok(Some(Token::new(Colon, start, self.position)))
+            }
             '\n' | ';' => {
                 self.advance();
                 Ok(Some(Token::new(Newline, start, self.position)))
             }
             '\0' => Ok(None),
-            _ => Err(LexerError::new(
+            _ => Err(LexError::new(
                 format!("Illegal character: '{}'", self.ch),
                 start,
                 self.position,
@@ -190,7 +185,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn number(&mut self) -> Result<Option<Token>, LexerError> {
+    fn number(&mut self) -> LexResult {
         let start = self.position;
         let mut num_str: String = self.ch.to_string();
         let mut decimals = 0;
@@ -207,8 +202,8 @@ impl<'a> Lexer<'a> {
         if decimals > 0 {
             match num_str.parse::<f64>() {
                 Ok(x) => Ok(Some(Token::new(Float(x), start, self.position))),
-                Err(_) => Err(LexerError::new(
-                    format!("Invalid float: '{}'", num_str),
+                Err(_) => Err(LexError::new(
+                    "Invalid float".to_string(),
                     start,
                     self.position,
                 )),
@@ -216,8 +211,8 @@ impl<'a> Lexer<'a> {
         } else {
             match num_str.parse::<u32>() {
                 Ok(x) => Ok(Some(Token::new(Int(x), start, self.position))),
-                Err(_) => Err(LexerError::new(
-                    format!("Invalid int: '{}'", num_str),
+                Err(_) => Err(LexError::new(
+                    "Invalid int".to_string(),
                     start,
                     self.position,
                 )),
@@ -225,7 +220,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn string(&mut self) -> Result<Option<Token>, LexerError> {
+    fn string(&mut self) -> LexResult {
         let start = self.position;
         self.advance();
         let mut string = String::new();
@@ -256,7 +251,7 @@ impl<'a> Lexer<'a> {
         Ok(Some(Token::new(Str(string), start, self.position)))
     }
 
-    fn char(&mut self) -> Result<Option<Token>, LexerError> {
+    fn char(&mut self) -> LexResult {
         let start = self.position;
         self.advance();
 
@@ -276,14 +271,18 @@ impl<'a> Lexer<'a> {
         self.advance();
 
         if self.ch != '\'' {
-            panic!("char is too long");
+            return Err(LexError::new(
+                "Char is too long".to_string(),
+                start,
+                self.position,
+            ));
         }
         self.advance();
 
         Ok(Some(Token::new(Char(ch), start, self.position)))
     }
 
-    fn word(&mut self) -> Result<Option<Token>, LexerError> {
+    fn word(&mut self) -> LexResult {
         let start = self.position;
         let mut word: String = self.ch.to_string();
         self.advance();

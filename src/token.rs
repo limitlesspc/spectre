@@ -30,6 +30,8 @@ pub enum TokenType {
     LBrace,
     RBrace,
 
+    Colon,
+
     Not,
     And,
     Or,
@@ -79,6 +81,8 @@ impl fmt::Display for TokenType {
             RBracket => write!(f, "']'"),
             LBrace => write!(f, "'{{'"),
             RBrace => write!(f, "'}}'"),
+
+            Colon => write!(f, "':'"),
 
             Not => write!(f, "'not'"),
             And => write!(f, "'and'"),
