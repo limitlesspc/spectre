@@ -52,6 +52,8 @@ pub enum NodeType<'a> {
     Index(Box<Node<'a>>, Box<Node<'a>>),
 
     Statements(Vec<Node<'a>>),
+
+    EOF,
 }
 
 impl<'a> fmt::Display for NodeType<'a> {
@@ -149,6 +151,8 @@ impl<'a> fmt::Display for NodeType<'a> {
                     .collect::<Vec<String>>()
                     .join("\n  ")
             ),
+
+            EOF => write!(f, "<eof>"),
         }
     }
 }
@@ -168,6 +172,6 @@ impl<'a> Node<'a> {
 
 impl fmt::Display for Node<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{} {}", self.start, self.end, self.ty)
+        write!(f, "{}", self.ty)
     }
 }

@@ -36,16 +36,26 @@ fn run(source: &str, log: bool) {
     let begin = Instant::now();
 
     let mut lexer = Lexer::new(source);
-
-    loop {
-        let token = lexer.next_token();
-        match token {
-            Ok(token) => match token {
-                Some(token) => println!("{}", token),
-                None => break,
-            },
-            Err(error) => panic!("Lexer error: {}", error),
+    let tokens = match lexer.lex() {
+        Ok(tokens) => tokens,
+        Err(error) => panic!("Lexer error: {}", error),
+    };
+    if log {
+        println!("tokens:");
+        for token in tokens.iter() {
+            println!("{}", token);
         }
+        println!();
+    }
+
+    let mut parser = Parser::new(tokens);
+    let ast = match parser.parse() {
+        Ok(node) => node,
+        Err(error) => panic!("Parser error: {}", error),
+    };
+    if log {
+        println!("ast:");
+        println!("{}\n", ast);
     }
 
     let end = Instant::now();

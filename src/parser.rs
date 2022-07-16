@@ -1,15 +1,16 @@
 use std::fmt;
 
-use crate::{BinaryOp, Lexer, Node, NodeType, Position, Token, TokenType, UnaryOp};
+use crate::{BinaryOp, Node, NodeType, Position, Token, TokenType, UnaryOp};
 use TokenType::*;
 
 pub struct Parser<'a> {
-    lexer: Lexer<'a>,
+    tokens: Vec<Token<'a>>,
     token: Token<'a>,
+    index: usize,
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct ParseError<'a> {
+pub struct ParseError<'a> {
     message: String,
     start: Position<'a>,
     end: Position<'a>,
@@ -31,35 +32,32 @@ impl<'a> fmt::Display for ParseError<'a> {
     }
 }
 
-type ParseResult<'a> = Result<Option<Node<'a>>, ParseError<'a>>;
+pub type ParseResult<'a> = Result<Node<'a>, ParseError<'a>>;
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str) -> Self {
-        let lexer = Lexer::new(source);
+    pub fn new(tokens: Vec<Token<'a>>) -> Self {
         Self {
-            lexer,
-            token: lexer.next_token(),
+            token: tokens[0].clone(),
+            tokens,
+            index: 0,
         }
     }
 
-    fn error(&self, message: String) -> ParseError<'a> {
-        ParseError {
-            message,
-            start: self.token.start,
-            end: self.token.end,
-        }
+    fn advance(&mut self) {
+        self.index += 1;
+        self.token = self
+            .tokens
+            .get(self.index)
+            .unwrap_or(&Token::new(
+                TokenType::EOF,
+                Position::new(""),
+                Position::new(""),
+            ))
+            .clone();
     }
 
-    fn advance(&'a mut self) {
-        let next = self.tokens.next();
-        self.token = match next {
-            Some(token) => token,
-            None => &Token::new(EOF, Position::new(""), Position::new("")),
-        };
-    }
-
-    fn skip_newlines(&'a mut self) -> u32 {
-        let mut newlines: u32 = 0;
+    fn skip_newlines(&mut self) -> usize {
+        let mut newlines: usize = 0;
         while self.token.ty == Newline {
             self.advance();
             newlines += 1;
@@ -67,11 +65,11 @@ impl<'a> Parser<'a> {
         newlines
     }
 
-    pub fn parse(&'a mut self) -> Result<Node, ParseError> {
+    pub fn parse(&mut self) -> ParseResult<'a> {
         self.statements()
     }
 
-    fn statements(&'a mut self) -> Result<Node, ParseError> {
+    fn statements(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let mut statements: Vec<Node> = vec![];
         self.skip_newlines();
@@ -105,7 +103,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    pub fn statement(&'a mut self) -> Result<Node, ParseError> {
+    fn statement(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         match self.token.ty {
             Return => {
@@ -120,7 +118,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expr(&'a mut self) -> Result<Node, ParseError> {
+    fn expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.or_expr()?;
 
@@ -147,7 +145,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn or_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn or_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.and_expr()?;
 
@@ -164,7 +162,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn and_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn and_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.not_expr()?;
 
@@ -181,7 +179,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn not_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn not_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         match self.token.ty {
             Not => {
@@ -196,7 +194,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn comp_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn comp_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.arith_expr()?;
 
@@ -217,7 +215,7 @@ impl<'a> Parser<'a> {
         comp_expr!(EqEq, Neq, Lt, Lte, Gt, Gte)
     }
 
-    fn arith_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn arith_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.term()?;
 
@@ -227,7 +225,7 @@ impl<'a> Parser<'a> {
                     $(
                         $token => {
                             self.advance();
-                            Ok(Node::new(NodeType::Binary(Box::new(node), BinaryOp::$token, Box::new(self.arith_expr()?)), self.token.start, self.token.end))
+                            Ok(Node::new(NodeType::Binary(Box::new(node), BinaryOp::$token, Box::new(self.arith_expr()?)), start, self.token.end))
                         },
                     )*
                     _ => Ok(node),
@@ -238,7 +236,7 @@ impl<'a> Parser<'a> {
         arith_expr!(Add, Sub)
     }
 
-    fn term(&'a mut self) -> Result<Node, ParseError> {
+    fn term(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.factor()?;
 
@@ -248,7 +246,7 @@ impl<'a> Parser<'a> {
                     $(
                         $token => {
                             self.advance();
-                            Ok(Node::new(NodeType::Binary(Box::new(node), BinaryOp::$token, Box::new(self.term()?)), self.token.start, self.token.end))
+                            Ok(Node::new(NodeType::Binary(Box::new(node), BinaryOp::$token, Box::new(self.term()?)), start, self.token.end))
                         },
                     )*
                     _ => Ok(node),
@@ -259,7 +257,7 @@ impl<'a> Parser<'a> {
         term!(Mul, Div)
     }
 
-    fn factor(&'a mut self) -> Result<Node, ParseError> {
+    fn factor(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         match self.token.ty {
             Add => {
@@ -278,11 +276,11 @@ impl<'a> Parser<'a> {
                     self.token.end,
                 ))
             }
-            _ => self.call(),
+            _ => self.power(),
         }
     }
 
-    fn power(&'a mut self) -> Result<Node, ParseError> {
+    fn power(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.call()?;
 
@@ -299,7 +297,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn call(&'a mut self) -> Result<Node, ParseError> {
+    fn call(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.index()?;
 
@@ -317,7 +315,7 @@ impl<'a> Parser<'a> {
                         ))
                     }
                     _ => Err(ParseError::new(
-                        "expected identifier",
+                        "expected identifier".to_string(),
                         start,
                         self.token.end,
                     )),
@@ -327,7 +325,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn index(&'a mut self) -> Result<Node, ParseError> {
+    fn index(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         let node = self.atom()?;
 
@@ -344,46 +342,54 @@ impl<'a> Parser<'a> {
                             self.token.end,
                         ))
                     }
-                    _ => Err(ParseError::new("expected ']'", start, self.token.end)),
+                    _ => Err(ParseError::new(
+                        "expected ']'".to_string(),
+                        start,
+                        self.token.end,
+                    )),
                 }
             }
             _ => Ok(node),
         }
     }
 
-    fn atom(&'a mut self) -> Result<Node, ParseError> {
+    fn atom(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
-        match self.token.ty {
+        match self.token.clone().ty {
             Int(value) => {
                 self.advance();
-                Ok(Node::new(NodeType::Int(value),start,self.token.end))
+                Ok(Node::new(NodeType::Int(value), start, self.token.end))
             }
             Float(value) => {
                 self.advance();
-                Ok(Node::new(NodeType::Float(value),start,self.token.end))
+                Ok(Node::new(NodeType::Float(value), start, self.token.end))
             }
             Bool(value) => {
                 self.advance();
-                Ok(Node::new(NodeType::Bool(value),start,self.token.end))
+                Ok(Node::new(NodeType::Bool(value), start, self.token.end))
             }
             Str(value) => {
                 self.advance();
-                Ok(Node::new(NodeType::Str(value),start,self.token.end))
+                Ok(Node::new(NodeType::Str(value), start, self.token.end))
             }
             Char(value) => {
                 self.advance();
-                Ok(Node::new(NodeType::Char(value),start,self.token.end))
+                Ok(Node::new(NodeType::Char(value), start, self.token.end))
             }
             Identifier(name) => {
                 self.advance();
-                Ok(Node::new(NodeType::Identifier(name),start,self.token.end))
+                Ok(Node::new(NodeType::Identifier(name), start, self.token.end))
             }
             LParen => {
                 self.advance();
                 let node = self.expr()?;
 
                 if self.token.ty != RParen {
-                    return Err(ParseError::new("expected ')'", self.token.start, self.token.end));
+                    return Err(ParseError::new(
+                        "expected ')'".to_string(),
+                        self.token.start,
+                        self.token.end,
+                    ));
                 }
                 self.advance();
 
@@ -394,12 +400,21 @@ impl<'a> Parser<'a> {
             While => self.while_expr(),
             For => self.for_expr(),
             Fn => self.fn_expr(),
-            EOF => Ok(Node::new(NodeType::EOF, Position::new(""), Position::new(""))),
-            _ => Err(ParseError::new("expected int, float, bool, str, type, identifier, '(', 'if', 'while', 'for', or 'fn'", start, self.token.end)),
+            EOF => Ok(Node::new(
+                NodeType::EOF,
+                Position::new(""),
+                Position::new(""),
+            )),
+            _ => Err(ParseError::new(
+                "expected int, float, bool, str, identifier, '(', 'if', 'while', 'for', or 'fn'"
+                    .to_string(),
+                start,
+                self.token.end,
+            )),
         }
     }
 
-    fn array_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn array_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
@@ -408,7 +423,7 @@ impl<'a> Parser<'a> {
         Ok(Node::new(NodeType::Array(nodes), start, self.token.end))
     }
 
-    fn if_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn if_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
@@ -421,13 +436,13 @@ impl<'a> Parser<'a> {
             }
             LBrace => self.block(),
             _ => Err(ParseError::new(
-                "expected ':' or '{'",
+                "expected ':' or '{'".to_string(),
                 self.token.start,
                 self.token.end,
             )),
         }?;
 
-        let newlines = self.skip_newlines();
+        self.skip_newlines();
         let else_node = match self.token.ty {
             Else => Some(Box::new(self.else_expr()?)),
             _ => None,
@@ -440,7 +455,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn else_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn else_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
@@ -452,14 +467,14 @@ impl<'a> Parser<'a> {
             LBrace => self.block(),
             If => self.if_expr(),
             _ => Err(ParseError::new(
-                "expected ':', '{', or 'if'",
-                self.token.start,
+                "expected ':', '{', or 'if'".to_string(),
+                start,
                 self.token.end,
             )),
         }
     }
 
-    fn while_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn while_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
@@ -472,8 +487,8 @@ impl<'a> Parser<'a> {
             }
             LBrace => self.block(),
             _ => Err(ParseError::new(
-                "expected ':' or '{'",
-                self.token.start,
+                "expected ':' or '{'".to_string(),
+                start,
                 self.token.end,
             )),
         }?;
@@ -485,19 +500,15 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn for_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn for_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
-        let identifier = match self.token.ty {
-            Identifier(name) => Ok(Node::new(
-                NodeType::Identifier(name),
-                self.token.start,
-                self.token.end,
-            )),
+        let identifier = match self.token.clone().ty {
+            Identifier(name) => Ok(Node::new(NodeType::Identifier(name), start, self.token.end)),
             _ => Err(ParseError::new(
-                "expected identifier",
-                self.token.start,
+                "expected identifier".to_string(),
+                start,
                 self.token.end,
             )),
         }?;
@@ -505,7 +516,7 @@ impl<'a> Parser<'a> {
 
         if self.token.ty != In {
             return Err(ParseError::new(
-                "expected 'in'",
+                "expected 'in'".to_string(),
                 self.token.start,
                 self.token.end,
             ));
@@ -521,7 +532,7 @@ impl<'a> Parser<'a> {
             }
             LBrace => self.block(),
             _ => Err(ParseError::new(
-                "expected ':' or '{'",
+                "expected ':' or '{'".to_string(),
                 self.token.start,
                 self.token.end,
             )),
@@ -534,11 +545,11 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn fn_expr(&'a mut self) -> Result<Node, ParseError> {
+    fn fn_expr(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         self.advance();
 
-        let name = match self.token.ty {
+        let name = match self.token.clone().ty {
             Identifier(name) => Ok(Node::new(
                 NodeType::Identifier(name.clone()),
                 self.token.start,
@@ -546,7 +557,7 @@ impl<'a> Parser<'a> {
             )),
             _ => {
                 return Err(ParseError::new(
-                    "expected identifier",
+                    "expected identifier".to_string(),
                     self.token.start,
                     self.token.end,
                 ))
@@ -556,7 +567,7 @@ impl<'a> Parser<'a> {
 
         if self.token.ty != LParen {
             return Err(ParseError::new(
-                "expected '('",
+                "expected '('".to_string(),
                 self.token.start,
                 self.token.end,
             ));
@@ -566,7 +577,7 @@ impl<'a> Parser<'a> {
         let mut args: Vec<Node> = vec![];
 
         while self.token.ty != RParen {
-            let name = match self.token.ty {
+            let name = match self.token.clone().ty {
                 Identifier(name) => Ok(Node::new(
                     NodeType::Identifier(name.clone()),
                     self.token.start,
@@ -574,7 +585,7 @@ impl<'a> Parser<'a> {
                 )),
                 _ => {
                     return Err(ParseError::new(
-                        "expected identifier",
+                        "expected identifier".to_string(),
                         start,
                         self.token.end,
                     ))
@@ -582,12 +593,12 @@ impl<'a> Parser<'a> {
             }?;
             self.advance();
 
-            match self.token.ty {
+            match self.token.clone().ty {
                 Comma => self.advance(),
                 RParen => {}
                 _ => {
                     return Err(ParseError::new(
-                        "expected ',' or ')'",
+                        "expected ',' or ')'".to_string(),
                         self.token.start,
                         self.token.end,
                     ))
@@ -599,7 +610,7 @@ impl<'a> Parser<'a> {
 
         if self.token.ty != RParen {
             return Err(ParseError::new(
-                "expected ')'",
+                "expected ')'".to_string(),
                 self.token.start,
                 self.token.end,
             ));
@@ -609,7 +620,7 @@ impl<'a> Parser<'a> {
         let body = match self.token.ty {
             LBrace => self.block(),
             _ => Err(ParseError::new(
-                "expected '{'",
+                "expected '{'".to_string(),
                 self.token.start,
                 self.token.end,
             )),
@@ -622,19 +633,20 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn list(&'a mut self, end: TokenType) -> Result<Vec<Node>, ParseError> {
+    fn list(&mut self, end: TokenType) -> Result<Vec<Node<'a>>, ParseError<'a>> {
         let start = self.token.start;
         let mut nodes: Vec<Node> = vec![];
 
         while self.token.ty != end {
             nodes.push(self.expr()?);
-            match self.token.ty {
+            let start = self.token.start;
+            match self.token.clone().ty {
                 Comma => self.advance(),
                 t if t == end => {}
                 _ => {
                     return Err(ParseError::new(
-                        &format!("expected ',' or '{}'", end),
-                        self.token.start,
+                        format!("expected ',' or '{}'", end),
+                        start,
                         self.token.end,
                     ))
                 }
@@ -642,21 +654,25 @@ impl<'a> Parser<'a> {
         }
 
         if self.token.ty != end {
-            panic!("expected '{}'", end);
+            return Err(ParseError::new(
+                format!("expected '{}'", end),
+                start,
+                self.token.end,
+            ));
         }
         self.advance();
 
         Ok(nodes)
     }
 
-    fn block(&'a mut self) -> Result<Node, ParseError> {
+    fn block(&mut self) -> ParseResult<'a> {
         self.advance();
 
         let statements = self.statements()?;
 
         if self.token.ty != RBrace {
             return Err(ParseError::new(
-                "expected '}'",
+                "expected '}'".to_string(),
                 self.token.start,
                 self.token.end,
             ));

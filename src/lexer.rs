@@ -33,7 +33,7 @@ impl<'a> fmt::Display for LexError<'a> {
     }
 }
 
-type LexResult<'a> = Result<Option<Token<'a>>, LexError<'a>>;
+type LexResult<'a> = Result<Token<'a>, LexError<'a>>;
 
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
@@ -49,7 +49,18 @@ impl<'a> Lexer<'a> {
         self.ch = self.source.chars().nth(self.position.index).unwrap_or('\0');
     }
 
-    pub fn next_token(&mut self) -> LexResult {
+    pub fn lex(&mut self) -> Result<Vec<Token<'a>>, LexError<'a>> {
+        let mut tokens: Vec<Token> = vec![];
+        let mut token = self.next_token()?;
+        while token.ty != TokenType::EOF {
+            tokens.push(token);
+            token = self.next_token()?;
+        }
+        tokens.push(token);
+        Ok(tokens)
+    }
+
+    fn next_token(&mut self) -> LexResult<'a> {
         loop {
             match self.ch {
                 ' ' | '\t' | '\r' => self.advance(),
@@ -66,117 +77,124 @@ impl<'a> Lexer<'a> {
             'a'..='z' | 'A'..='Z' | '_' | 'Α'..='ω' | '∞' => self.word(),
             '=' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(EqEq, start, self.position)
                     }
                     _ => Token::new(Eq, start, self.position),
-                }))
+                })
             }
             '+' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(AddEq, start, self.position)
                     }
                     _ => Token::new(Add, start, self.position),
-                }))
+                })
             }
             '-' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(SubEq, start, self.position)
                     }
                     _ => Token::new(Sub, start, self.position),
-                }))
+                })
             }
             '*' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(MulEq, start, self.position)
                     }
                     _ => Token::new(Mul, start, self.position),
-                }))
+                })
             }
             '/' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(DivEq, start, self.position)
                     }
                     _ => Token::new(Div, start, self.position),
-                }))
+                })
             }
             '^' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(PowEq, start, self.position)
                     }
                     _ => Token::new(Pow, start, self.position),
-                }))
+                })
             }
             '<' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(Lte, start, self.position)
                     }
                     _ => Token::new(Lt, start, self.position),
-                }))
+                })
             }
             '>' => {
                 self.advance();
-                Ok(Some(match self.ch {
+                Ok(match self.ch {
                     '=' => {
                         self.advance();
                         Token::new(Gte, start, self.position)
                     }
                     _ => Token::new(Gt, start, self.position),
-                }))
+                })
             }
             '(' => {
                 self.advance();
-                Ok(Some(Token::new(LParen, start, self.position)))
+                Ok(Token::new(LParen, start, self.position))
             }
             ')' => {
                 self.advance();
-                Ok(Some(Token::new(RParen, start, self.position)))
+                Ok(Token::new(RParen, start, self.position))
             }
             '[' => {
                 self.advance();
-                Ok(Some(Token::new(LBracket, start, self.position)))
+                Ok(Token::new(LBracket, start, self.position))
             }
             ']' => {
                 self.advance();
-                Ok(Some(Token::new(RBracket, start, self.position)))
+                Ok(Token::new(RBracket, start, self.position))
             }
             '{' => {
                 self.advance();
-                Ok(Some(Token::new(LBrace, start, self.position)))
+                Ok(Token::new(LBrace, start, self.position))
             }
             '}' => {
                 self.advance();
-                Ok(Some(Token::new(RBrace, start, self.position)))
+                Ok(Token::new(RBrace, start, self.position))
+            }
+            ',' => {
+                self.advance();
+                Ok(Token::new(Comma, start, self.position))
             }
             ':' => {
                 self.advance();
-                Ok(Some(Token::new(Colon, start, self.position)))
+                Ok(Token::new(Colon, start, self.position))
             }
             '\n' | ';' => {
                 self.advance();
-                Ok(Some(Token::new(Newline, start, self.position)))
+                Ok(Token::new(Newline, start, self.position))
             }
-            '\0' => Ok(None),
+            '\0' => {
+                self.advance();
+                Ok(Token::new(EOF, start, self.position))
+            }
             _ => Err(LexError::new(
                 format!("Illegal character: '{}'", self.ch),
                 start,
@@ -185,7 +203,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn number(&mut self) -> LexResult {
+    fn number(&mut self) -> LexResult<'a> {
         let start = self.position;
         let mut num_str: String = self.ch.to_string();
         let mut decimals = 0;
@@ -201,7 +219,7 @@ impl<'a> Lexer<'a> {
 
         if decimals > 0 {
             match num_str.parse::<f64>() {
-                Ok(x) => Ok(Some(Token::new(Float(x), start, self.position))),
+                Ok(x) => Ok(Token::new(Float(x), start, self.position)),
                 Err(_) => Err(LexError::new(
                     "Invalid float".to_string(),
                     start,
@@ -210,7 +228,7 @@ impl<'a> Lexer<'a> {
             }
         } else {
             match num_str.parse::<u32>() {
-                Ok(x) => Ok(Some(Token::new(Int(x), start, self.position))),
+                Ok(x) => Ok(Token::new(Int(x), start, self.position)),
                 Err(_) => Err(LexError::new(
                     "Invalid int".to_string(),
                     start,
@@ -220,7 +238,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn string(&mut self) -> LexResult {
+    fn string(&mut self) -> LexResult<'a> {
         let start = self.position;
         self.advance();
         let mut string = String::new();
@@ -248,10 +266,10 @@ impl<'a> Lexer<'a> {
         }
         self.advance();
 
-        Ok(Some(Token::new(Str(string), start, self.position)))
+        Ok(Token::new(Str(string), start, self.position))
     }
 
-    fn char(&mut self) -> LexResult {
+    fn char(&mut self) -> LexResult<'a> {
         let start = self.position;
         self.advance();
 
@@ -279,10 +297,10 @@ impl<'a> Lexer<'a> {
         }
         self.advance();
 
-        Ok(Some(Token::new(Char(ch), start, self.position)))
+        Ok(Token::new(Char(ch), start, self.position))
     }
 
-    fn word(&mut self) -> LexResult {
+    fn word(&mut self) -> LexResult<'a> {
         let start = self.position;
         let mut word: String = self.ch.to_string();
         self.advance();
@@ -297,7 +315,7 @@ impl<'a> Lexer<'a> {
             };
         }
 
-        Ok(Some(Token::new(
+        Ok(Token::new(
             match word.as_str() {
                 "true" => Bool(true),
                 "false" => Bool(false),
@@ -309,11 +327,12 @@ impl<'a> Lexer<'a> {
                 "else" => Else,
                 "while" => While,
                 "for" => For,
+                "fn" => Fn,
                 "return" => Return,
                 _ => Identifier(word),
             },
             start,
             self.position,
-        )))
+        ))
     }
 }

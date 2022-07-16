@@ -30,6 +30,7 @@ pub enum TokenType {
     LBrace,
     RBrace,
 
+    Comma,
     Colon,
 
     Not,
@@ -47,9 +48,11 @@ pub enum TokenType {
     Else,
     While,
     For,
+    Fn,
     Return,
 
     Newline,
+    EOF,
 }
 
 impl fmt::Display for TokenType {
@@ -82,6 +85,7 @@ impl fmt::Display for TokenType {
             LBrace => write!(f, "'{{'"),
             RBrace => write!(f, "'}}'"),
 
+            Comma => write!(f, "','"),
             Colon => write!(f, "':'"),
 
             Not => write!(f, "'not'"),
@@ -99,9 +103,11 @@ impl fmt::Display for TokenType {
             Else => write!(f, "'else'"),
             While => write!(f, "'while'"),
             For => write!(f, "'for'"),
+            Fn => write!(f, "'fn'"),
             Return => write!(f, "'return'"),
 
             Newline => write!(f, "'\\n'"),
+            EOF => write!(f, "<eof>"),
         }
     }
 }
@@ -121,6 +127,6 @@ impl<'a> Token<'a> {
 
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{} {}", self.start, self.end, self.ty)
+        write!(f, "{}", self.ty)
     }
 }
