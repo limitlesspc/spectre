@@ -10,6 +10,7 @@ pub enum UnaryOp {
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
+    Eq,
     Add,
     Sub,
     Mul,
@@ -32,9 +33,9 @@ pub enum NodeType<'a> {
     Int(u32),
     Float(f64),
     Bool(bool),
-    Str(&'a str),
+    Str(String),
     Char(char),
-    Identifier(&'a str),
+    Identifier(String),
 
     Unary(UnaryOp, Box<Node<'a>>),
     Binary(Box<Node<'a>>, BinaryOp, Box<Node<'a>>),
@@ -76,6 +77,7 @@ impl<'a> fmt::Display for NodeType<'a> {
             Binary(left, op, right) => {
                 use BinaryOp::*;
                 match op {
+                    Eq => write!(f, "({} = {})", left, right),
                     Add => write!(f, "({} + {})", left, right),
                     Sub => write!(f, "({} - {})", left, right),
                     Mul => write!(f, "({} * {})", left, right),
@@ -159,8 +161,6 @@ pub struct Node<'a> {
     pub start: Position<'a>,
     pub end: Position<'a>,
 }
-
-pub static EOF_NODE: Node = Node::new(NodeType::EOF, Position::new(""), Position::new(""));
 
 impl<'a> Node<'a> {
     pub fn new(ty: NodeType<'a>, start: Position<'a>, end: Position<'a>) -> Self {

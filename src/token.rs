@@ -2,14 +2,14 @@ use std::fmt;
 
 use crate::Position;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum TokenType<'a> {
+#[derive(Clone, PartialEq)]
+pub enum TokenType {
     Int(u32),
     Float(f64),
     Bool(bool),
-    Str(&'a str),
+    Str(String),
     Char(char),
-    Identifier(&'a str),
+    Identifier(String),
 
     Eq,
     Add,
@@ -49,10 +49,9 @@ pub enum TokenType<'a> {
 
     Newline,
     Whitespace,
-    EOF,
 }
 
-impl<'a> fmt::Display for TokenType<'a> {
+impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use TokenType::*;
         match self {
@@ -101,22 +100,19 @@ impl<'a> fmt::Display for TokenType<'a> {
 
             Newline => write!(f, "'\\n'"),
             Whitespace => write!(f, "' '"),
-            EOF => write!(f, "<eof>"),
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Token<'a> {
-    pub ty: TokenType<'a>,
+    pub ty: TokenType,
     pub start: Position<'a>,
     pub end: Position<'a>,
 }
 
-pub static EOF_TOKEN: Token = Token::new(TokenType::EOF, Position::new(""), Position::new(""));
-
 impl<'a> Token<'a> {
-    pub fn new(ty: TokenType<'a>, start: Position<'a>, end: Position<'a>) -> Self {
+    pub fn new(ty: TokenType, start: Position<'a>, end: Position<'a>) -> Self {
         Self { ty, start, end }
     }
 }

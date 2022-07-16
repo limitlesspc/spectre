@@ -2,14 +2,14 @@ use std::fs;
 use std::time::Instant;
 
 mod lexer;
-mod node;
-mod parser;
+// mod node;
+// mod parser;
 mod position;
 mod token;
 
 pub use lexer::Lexer;
-pub use node::*;
-pub use parser::Parser;
+// pub use node::*;
+// pub use parser::Parser;
 pub use position::Position;
 pub use token::*;
 
@@ -29,29 +29,35 @@ fn main() {
 
 fn run_file(path: &str, log: bool) {
     let source = fs::read_to_string(path).unwrap();
-    run(&source, path, log);
+    run(&source, log);
 }
 
-fn run(source: &str, filename: &str, log: bool) {
+fn run(source: &str, log: bool) {
     let begin = Instant::now();
 
     let mut lexer = Lexer::new(source);
     let tokens = lexer.lex();
-    if log {
-        println!("tokens:");
-        for token in &tokens {
-            print!(" {}", token);
+    match tokens {
+        Ok(tokens) => {
+            if log {
+                println!("tokens:");
+                for token in &tokens {
+                    print!(" {}", token);
+                }
+                print!("\n");
+            }
+
+            // let mut parser = Parser::new(tokens);
+            // let ast = parser.parse();
+            // match ast {
+            //     Ok(ast) => {
+            //         println!("{}", ast);
+            //     }
+            //     Err(error) => println!("{}", error),
+            // }
         }
-        print!("\n");
-    }
-
-    let mut parser = Parser::new(tokens);
-    let ast = parser.parse().unwrap();
-    if log {
-        println!("ast: {}", ast);
-    }
-
-    // Run
+        Err(error) => println!("{}", error),
+    };
 
     let end = Instant::now();
     println!("Ran in {:.3}s", end.duration_since(begin).as_secs_f64());

@@ -1,6 +1,6 @@
-use std::slice::Iter;
+use std::{fmt, slice::Iter};
 
-use crate::{BinaryOp, Node, NodeType, Position, Token, TokenType, UnaryOp, EOF_NODE, EOF_TOKEN};
+use crate::{BinaryOp, Node, NodeType, Position, Token, TokenType, UnaryOp};
 use TokenType::*;
 
 pub struct Parser<'a> {
@@ -8,14 +8,15 @@ pub struct Parser<'a> {
     token: &'a Token<'a>,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 struct ParserError<'a> {
-    message: &'a str,
+    message: String,
     start: Position<'a>,
     end: Position<'a>,
 }
 
 impl<'a> ParserError<'a> {
-    fn new(message: &'a str, start: Position<'a>, end: Position<'a>) -> Self {
+    fn new(message: String, start: Position<'a>, end: Position<'a>) -> Self {
         ParserError {
             message,
             start,
@@ -24,10 +25,19 @@ impl<'a> ParserError<'a> {
     }
 }
 
+impl<'a> fmt::Display for ParserError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-{} {}", self.start, self.end, self.message)
+    }
+}
+
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
         let tokens_iter = tokens.iter();
-        let token = tokens_iter.next().unwrap_or(&EOF_TOKEN);
+        let token =
+            tokens_iter
+                .next()
+                .unwrap_or(&Token::new(EOF, Position::new(""), Position::new("")));
         Self {
             tokens: tokens_iter,
             token,
@@ -46,7 +56,7 @@ impl<'a> Parser<'a> {
         let next = self.tokens.next();
         self.token = match next {
             Some(token) => token,
-            None => &EOF_TOKEN,
+            None => &Token::new(EOF, Position::new(""), Position::new("")),
         };
     }
 
@@ -83,7 +93,7 @@ impl<'a> Parser<'a> {
             }
 
             let statement = self.statement()?;
-            if statement == EOF_NODE {
+            if statement.ty == NodeType::EOF {
                 more_statements = false;
                 continue;
             }
@@ -135,7 +145,7 @@ impl<'a> Parser<'a> {
             (AddEq, Add),
             (SubEq, Sub),
             (MulEq, Mul),
-            (DivEq, Div),
+            (DivEq, Div)
         )
     }
 
@@ -386,7 +396,7 @@ impl<'a> Parser<'a> {
             While => self.while_expr(),
             For => self.for_expr(),
             Fn => self.fn_expr(),
-            EOF => Ok(EOF_NODE),
+            EOF => Ok(Node::new(NodeType::EOF, Position::new(""), Position::new(""))),
             _ => Err(ParserError::new("expected int, float, bool, str, type, identifier, '(', 'if', 'while', 'for', or 'fn'", start, self.token.end)),
         }
     }
