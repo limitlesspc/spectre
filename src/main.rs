@@ -5,12 +5,15 @@ mod lexer;
 mod node;
 mod parser;
 mod position;
+mod runtime;
 mod token;
 
 pub use lexer::*;
 pub use node::*;
 pub use parser::*;
-pub use position::Position;
+pub use position::*;
+pub use runtime::Interpreter;
+pub use runtime::*;
 pub use token::*;
 
 fn main() {
@@ -57,6 +60,13 @@ fn run(source: &str, log: bool) {
         println!("ast:");
         println!("{}\n", ast);
     }
+
+    let mut interpreter = Interpreter::new(ast);
+    let value = match interpreter.run() {
+        Ok(value) => value,
+        Err(error) => panic!("Interpreter error: {}", error),
+    };
+    println!("{}", value);
 
     let end = Instant::now();
     println!("Ran in {:.3}s", end.duration_since(begin).as_secs_f64());

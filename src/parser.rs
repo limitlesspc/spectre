@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{BinaryOp, Node, NodeType, Position, Token, TokenType, UnaryOp};
+use crate::{BinaryOp, IdentifierOp, Node, NodeType, Position, Token, TokenType, UnaryOp};
 use TokenType::*;
 
 pub struct Parser<'a> {
@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
                     $(
                         $token => {
                             self.advance();
-                            Ok(Node::new(NodeType::Binary(Box::new(node), BinaryOp::$op, Box::new(self.or_expr()?)), start, self.token.end))
+                            Ok(Node::new(NodeType::IdentifierBinary(Box::new(node), IdentifierOp::$op, Box::new(self.or_expr()?)), start, self.token.end))
                         }
                     )*,
                     _ => Ok(node),
@@ -260,14 +260,6 @@ impl<'a> Parser<'a> {
     fn factor(&mut self) -> ParseResult<'a> {
         let start = self.token.start;
         match self.token.ty {
-            Add => {
-                self.advance();
-                Ok(Node::new(
-                    NodeType::Unary(UnaryOp::Pos, Box::new(self.factor()?)),
-                    start,
-                    self.token.end,
-                ))
-            }
             Sub => {
                 self.advance();
                 Ok(Node::new(

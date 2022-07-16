@@ -4,13 +4,11 @@ use crate::Position;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
-    Pos,
     Neg,
     Not,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
-    Eq,
     Add,
     Sub,
     Mul,
@@ -27,6 +25,15 @@ pub enum BinaryOp {
     Gte,
     In,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum IdentifierOp {
+    Eq,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Pow,
+}
 
 #[derive(Clone, PartialEq)]
 pub enum NodeType<'a> {
@@ -35,12 +42,13 @@ pub enum NodeType<'a> {
     Bool(bool),
     Str(String),
     Char(char),
+    Array(Vec<Node<'a>>),
+
     Identifier(String),
 
     Unary(UnaryOp, Box<Node<'a>>),
     Binary(Box<Node<'a>>, BinaryOp, Box<Node<'a>>),
-
-    Array(Vec<Node<'a>>),
+    IdentifierBinary(Box<Node<'a>>, IdentifierOp, Box<Node<'a>>),
 
     If(Box<Node<'a>>, Box<Node<'a>>, Option<Box<Node<'a>>>),
     While(Box<Node<'a>>, Box<Node<'a>>),
@@ -65,12 +73,23 @@ impl<'a> fmt::Display for NodeType<'a> {
             Bool(value) => write!(f, "{}", value),
             Str(value) => write!(f, "\"{}\"", value),
             Char(value) => write!(f, "'{}'", value),
+            Array(nodes) => {
+                write!(
+                    f,
+                    "[{}]",
+                    nodes
+                        .iter()
+                        .map(|node| format!("{}", node))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+
             Identifier(name) => write!(f, "{}", name),
 
             Unary(op, node) => {
                 use UnaryOp::*;
                 match op {
-                    Pos => write!(f, "(+{})", node),
                     Neg => write!(f, "(-{})", node),
                     Not => write!(f, "(not {})", node),
                 }
@@ -78,7 +97,6 @@ impl<'a> fmt::Display for NodeType<'a> {
             Binary(left, op, right) => {
                 use BinaryOp::*;
                 match op {
-                    Eq => write!(f, "({} = {})", left, right),
                     Add => write!(f, "({} + {})", left, right),
                     Sub => write!(f, "({} - {})", left, right),
                     Mul => write!(f, "({} * {})", left, right),
@@ -96,17 +114,16 @@ impl<'a> fmt::Display for NodeType<'a> {
                     In => write!(f, "({} in {})", left, right),
                 }
             }
-
-            Array(nodes) => {
-                write!(
-                    f,
-                    "[{}]",
-                    nodes
-                        .iter()
-                        .map(|node| format!("{}", node))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
+            IdentifierBinary(name, op, value) => {
+                use IdentifierOp::*;
+                match op {
+                    Eq => write!(f, "({} = {})", name, value),
+                    Add => write!(f, "({} += {})", name, value),
+                    Sub => write!(f, "({} -= {})", name, value),
+                    Mul => write!(f, "({} *= {})", name, value),
+                    Div => write!(f, "({} /= {})", name, value),
+                    Pow => write!(f, "({} ^= {})", name, value),
+                }
             }
 
             If(condition, body, else_body) => match else_body {
@@ -131,16 +148,16 @@ impl<'a> fmt::Display for NodeType<'a> {
             }
 
             Return(node) => write!(f, "(return {})", node),
-            Call(name, args) => write!(
+            Call(node, args) => write!(
                 f,
                 "{}({})",
-                name,
+                node,
                 args.iter()
                     .map(|arg| format!("{}", arg))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Index(name, index) => write!(f, "{}[{}]", name, index),
+            Index(node, index) => write!(f, "{}[{}]", node, index),
 
             Statements(nodes) => write!(
                 f,
