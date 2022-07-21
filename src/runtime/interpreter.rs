@@ -164,6 +164,7 @@ impl<'a> Interpreter<'a> {
                         }
                         self.visit(*body)
                     }
+                    Value::BuiltinFn(_, native_fn) => native_fn(arg_values),
                     _ => Err("Invalid call".to_string()),
                 }
             }

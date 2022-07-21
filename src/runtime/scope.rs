@@ -29,4 +29,10 @@ impl<'a> Scope<'a> {
         self.variables.insert(name, value.clone());
         Ok(value)
     }
+
+    pub fn set_fn(&mut self, name: &str, func: fn(Vec<Value<'a>>) -> RuntimeResult<'a>) {
+        let name = name.to_string();
+        let value = Value::BuiltinFn(name.clone(), func);
+        self.variables.insert(name, value.clone());
+    }
 }

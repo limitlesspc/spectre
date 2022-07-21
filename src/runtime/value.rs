@@ -11,6 +11,7 @@ pub enum Value<'a> {
     Char(char),
     Array(Vec<Value<'a>>),
     Fn(String, Vec<String>, Box<Node<'a>>),
+    BuiltinFn(String, fn(Vec<Value<'a>>) -> RuntimeResult<'a>),
     None,
 }
 
@@ -26,6 +27,7 @@ impl<'a> Value<'a> {
             Char(value) => value != '\0',
             Array(_) => true,
             Fn(_, _, _) => true,
+            BuiltinFn(_, _) => true,
             None => false,
         }
     }
@@ -327,6 +329,7 @@ impl<'a> fmt::Display for Value<'a> {
                     .join(",")
             ),
             Fn(name, _, _) => write!(f, "<fn {}>", name),
+            BuiltinFn(name, _) => write!(f, "<builtin fn {}>", name),
             None => write!(f, "none"),
         }
     }

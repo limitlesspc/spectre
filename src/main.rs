@@ -62,11 +62,11 @@ fn run(source: &str, log: bool) {
     }
 
     let mut interpreter = Interpreter::new(ast);
-    let value = match interpreter.run() {
-        Ok(value) => value,
+    add_builtins(&mut interpreter.scope);
+    match interpreter.run() {
+        Ok(_) => {}
         Err(error) => panic!("Interpreter error: {}", error),
     };
-    println!("{}", value);
 
     let end = Instant::now();
     println!("Ran in {:.3}s", end.duration_since(begin).as_secs_f64());
